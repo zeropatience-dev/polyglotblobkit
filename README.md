@@ -1,11 +1,12 @@
 # Universal Blob Filename Fix
 
-An open-source reference library for separating technical object keys from human filenames. **Prototype v0.1.0**; not an official Azure fix or production-certified service.
+An open-source reference library for separating technical object keys from human filenames. **Prototype v0.2.0**; not an official Azure fix or production-certified service.
 
 ## Design
 
 - New objects use random UUIDv4 keys (32 lowercase ASCII hexadecimal characters), with no extension.
 - The exact original Unicode filename is preserved as UTF-8 encoded into Base64 ASCII metadata (`original_filename_b64`). No Unicode normalization or transliteration is performed.
+- Uploads enforce a configurable per-file size limit (50 MB by default).
 - Uploads never overwrite an existing key. A collision fails; retry using a new upload if appropriate.
 - Downloads recover the original filename and expose an RFC 8187 HTTP attachment header.
 - The core has no external dependencies. Azure is the only implemented backend; S3, MinIO and .NET ports are possible future additions.
@@ -31,7 +32,7 @@ from blob_filename_fix.azure import AzureFilenameStorage
 
 container = ContainerClient.from_connection_string(
     os.environ['AZURE_STORAGE_CONNECTION_STRING'], 'documents')
-storage = AzureFilenameStorage(container)
+storage = AzureFilenameStorage(container, max_upload_mb=50)
 
 with open('local.pdf', 'rb') as f:
     key = storage.upload('合同_😀.pdf', f)
@@ -42,6 +43,36 @@ headers = storage.download_headers(name)
 # For HTTP responses stream.chunks() can be streamed with these headers.
 # Do not treat name as a trusted filesystem path.
 ```
+
+## Upload size limiter (v0.2.0)
+
+The default limit is **50 MB per file**, including for existing constructor calls. Configure a positive integer number of decimal megabytes (`1 MB = 1,000,000 bytes`). Exactly the limit is accepted; one byte above it is rejected. Downloads and existing objects are unaffected. Applications upgrading from v0.1.0 should explicitly choose their desired limit if 50 MB is too low.
+
+```python
+from blob_filename_fix import UploadTooLargeError
+from blob_filename_fix.azure import AzureFilenameStorage
+
+storage = AzureFilenameStorage(container, max_upload_mb=100)
+try:
+    key = storage.upload('合同.pdf', incoming_binary_stream)
+except UploadTooLargeError as exc:
+    # Return HTTP 413 (Content Too Large) in your web framework.
+    print(str(exc))
+```
+
+The storage-independent `UploadSizeLimiter` can also be used by future adapters:
+
+```python
+from blob_filename_fix import UploadSizeLimiter
+
+with UploadSizeLimiter(100).checked(incoming_binary_stream) as checked_data:
+    # Pass checked_data to a synchronous storage writer here.
+    pass
+```
+
+The limiter checks bytes directly or reads a binary stream from its current position. Streams (including non-seekable streams) are staged locally, up to 1 MiB in memory before spilling to temporary disk; oversized streams are stopped after at most limit + 1 bytes for compliant readers. Nothing is sent to Azure until validation passes. The staging file is closed on success and error, and the caller's stream remains open. Staging adds disk I/O and requires sufficient protected temporary storage. Use the checked data only inside its context. Do not rely on a client-reported Content-Length alone.
+
+This is a per-file limit, not a per-request, user or tenant quota. Configure request-body limits, timeouts, concurrency and disk quotas separately at your gateway/framework. Direct cloud uploads or other code paths that bypass this adapter are not covered. HTTP 413 mapping is the integrating application's responsibility; this library does not provide a web server.
 
 ## Security and scope
 
@@ -63,7 +94,7 @@ Choose Public when creating the empty repository if it should be available to ev
 
 ## Deutsch
 
-Dateinamen in allen Sprachen bleiben unverändert in Metadaten erhalten; der technische Blob-Name besteht ausschließlich aus einer UUID. Die Python-Referenzbibliothek ist unabhängig von internen Anwendungen. Ein Azure-Adapter ist enthalten. Andere Speicheranbieter benötigen eigene Adapter. Bestehende Dateien werden nicht verändert; die aufrufende Anwendung muss die Bibliothek integrieren. Kein Live-Test gegen Azure durchgeführt.
+Dateinamen in allen Sprachen bleiben unverändert in Metadaten erhalten; der technische Blob-Name besteht ausschließlich aus einer UUID. Die Python-Referenzbibliothek ist unabhängig von internen Anwendungen. Ein Azure-Adapter ist enthalten. Andere Speicheranbieter benötigen eigene Adapter. Bestehende Dateien werden nicht verändert; die aufrufende Anwendung muss die Bibliothek integrieren. Seit v0.2.0 gilt ein konfigurierbares Upload-Limit von standardmäßig 50 MB pro Datei (1 MB = 1.000.000 Bytes). Zu große Dateien werden vor dem Cloud-Upload abgelehnt. Kein Live-Test gegen Azure durchgeführt.
 
 ## References
 

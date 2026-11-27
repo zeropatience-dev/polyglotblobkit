@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "universal-blob-filename-fix"
-version = "0.1.0"
-description = "UUID object keys and reversible Unicode filenames"
+version = "0.2.0"
+description = "UUID object keys, reversible Unicode filenames and upload size limits"
 readme = "README.md"
 requires-python = ">=3.10"
 license = {file = "LICENSE"}
