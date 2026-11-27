@@ -7,6 +7,15 @@ security certification, guaranteed support period or response-time SLA. Use
 synthetic data in an isolated test environment; do not expose the preview gateway
 publicly or process confidential documents with it.
 
+## Maintainer Responsibilities
+
+We follow a Coordinated Vulnerability Disclosure (CVD) approach.
+
+- Investigate, verify and assess reported vulnerabilities.
+- Develop and test fixes for confirmed vulnerabilities.
+- Publish security updates and accompanying security advisories.
+- Coordinate disclosure with the reporter to protect affected users.
+
 ## Report a vulnerability privately
 
 Use the repository's Security tab → Report a vulnerability if private
