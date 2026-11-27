@@ -1,5 +1,6 @@
 """Explicit tenant bindings, deny by default, per-tenant policy and local audit."""
 from dataclasses import dataclass, field
+from contextlib import contextmanager
 from threading import Lock
 from time import monotonic
 import logging
@@ -145,6 +146,41 @@ class TenantGateway:
 
     def browser_policy(self, token, tenant):
         return self._run(token, tenant, 'policy', lambda b: b.policy.config.browser_policy())
+
+    @contextmanager
+    def upload_session(self, token, tenant):
+        """Authorize and rate-limit before an HTTP body is consumed.
+
+        Yield the trusted byte limit and a single-use synchronous writer.
+        The writer must be used within this context, by trusted server code.
+        """
+        known = tenant if isinstance(tenant, str) and len(tenant) <= 63 and tenant in self._bindings else '-'
+        used = False
+        active = True
+        completed = False
+        try:
+            binding = self._authorize(token, tenant, 'upload')
+            limiter = UploadSizeLimiter(binding.policy.config.max_upload_mb)
+            def write(filename, data):
+                nonlocal used, completed
+                if not active or used:
+                    raise RuntimeError('Upload session unavailable')
+                used = True
+                validate_filename(filename)
+                with limiter.checked(data) as staged:
+                    key = validate_key(binding.storage.upload(filename, staged))
+                completed = True
+                return key
+            yield limiter.max_bytes, write
+        except (SecurityError, UploadTooLargeError) as exc:
+            _LOG.info('action=upload tenant=%s outcome=denied code=%s', known, exc.code)
+            raise
+        except BaseException:
+            _LOG.warning('action=upload tenant=%s outcome=failed', known)
+            raise
+        finally:
+            active = False
+        _LOG.info('action=upload tenant=%s outcome=%s', known, 'allowed' if completed else 'abandoned')
 
     def upload(self, token, tenant, filename, data):
         def operation(b):

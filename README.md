@@ -1,6 +1,8 @@
 # PolyglotBlobKit
 
-An open-source reference library for separating technical object keys from human filenames. **Prototype v0.4.0**; not an official Azure fix or production-certified service.
+An open-source reference library for separating technical object keys from human filenames. **Integration preview v0.8.0 (alpha)**; not an official Azure fix or production-certified service.
+
+**Trust through transparency, not dependency.** See [project philosophy](PHILOSOPHY.md) and [0.8 integration preview](docs/integration-preview.md) for the current API, Docker instructions and test boundaries. Older version-specific sections below are historical.
 
 ## Design
 
@@ -9,7 +11,7 @@ An open-source reference library for separating technical object keys from human
 - Uploads enforce a configurable per-file size limit (50 MB by default).
 - Uploads never overwrite an existing key. A collision fails; retry using a new upload if appropriate.
 - Downloads recover the original filename and expose an RFC 8187 HTTP attachment header.
-- The core has no external dependencies. Azure is the only implemented backend; S3, MinIO and .NET ports are possible future additions.
+- The core has no external dependencies. Azure, S3 and MinIO adapters are available as optional previews; a REST gateway is optional. Native .NET ports are not implemented.
 
 ## Local tests (no cloud credentials or dependencies)
 
@@ -262,3 +264,5 @@ See [security preview](docs/security-preview.md) for opt-in tenant authorization
 ## Storage adapter preview
 
 See [storage preview](docs/storage-preview.md) for the optional S3 and MinIO adapters, compatibility limitations and integration impact.
+
+See also the [local verification report](docs/test-report-0.8.md).
