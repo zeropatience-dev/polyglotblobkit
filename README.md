@@ -1,6 +1,6 @@
-# Universal Blob Filename Fix
+# PolyglotBlobKit
 
-An open-source reference library for separating technical object keys from human filenames. **Prototype v0.3.0**; not an official Azure fix or production-certified service.
+An open-source reference library for separating technical object keys from human filenames. **Prototype v0.4.0**; not an official Azure fix or production-certified service.
 
 ## Design
 
@@ -83,14 +83,14 @@ The library is not an access-control layer. UUIDs are not credentials; the appli
 The archive contains source, tests, MIT license and GitHub Actions configuration. To publish to a new empty GitHub repository (you need a GitHub account with permission):
 
 ```sh
-git init -b main
-git add .
-git commit -m "Initial reference implementation"
-git remote add origin https://github.com/YOUR-ACCOUNT/universal-blob-filename-fix.git
+git clone /path/to/polyglotblobkit-v0.4.0.bundle polyglotblobkit
+cd polyglotblobkit
+git remote remove origin
+git remote add origin https://github.com/YOUR-ACCOUNT/polyglotblobkit.git
 git push -u origin main
 ```
 
-Choose Public when creating the empty repository if it should be available to everyone. The project name has not been reserved. No remote repository or PyPI distribution has been created.
+If starting from the source ZIP rather than the bundle, initialize a new repository with `git init -b main`, add and commit the files; this does not retain previous history. Choose Public when creating the empty repository if it should be available to everyone. The project name has not been reserved. No remote repository or PyPI distribution has been created.
 
 ## Deutsch
 
@@ -128,7 +128,7 @@ the repository root, then open `http://127.0.0.1:8000/web/`. No file content
 is sent anywhere or persisted by the demo. Run the module tests with Node 22:
 
 ```sh
-node --test web/upload-limiter.test.mjs
+node --test web/*.test.mjs
 ```
 
 Existing objects can be retrieved through an explicitly selected legacy route:
@@ -167,7 +167,90 @@ tests in addition to Python and Node unit tests. The public emulator-only
 credential in the workflow is not a real Azure secret. No SDK or API-version
 check is disabled. The workflow and emulator tests have not been executed in
 the build environment; Docker, Azurite and the Azure SDK were unavailable.
-The local results are 33 Python tests and 6 Node tests passed. The demo's DOM
-interaction has not been exercised in a real browser. Live Azure, Azure Data
+The v0.3.0 local results were 33 Python tests and 6 Node tests passed. See the v0.4.0 verification below. Live Azure, Azure Data
 Lake/SFTP, third-party systems, REST gateway, MIME type/extension compatibility,
 and load/security testing remain outside this release's verified scope.
+
+## v0.4.0 — modular policy and internationalization
+
+PolyglotBlobKit is the new project/distribution name. Both `polyglotblobkit`
+and `blob_filename_fix` imports work from this distribution, with the same
+classes and exception identities. Existing constructors, GUID keys, metadata
+and legacy access retain their previous behavior. When upgrading an installed
+old distribution, uninstall `universal-blob-filename-fix` first to avoid two
+packages owning the same legacy files, then install the new distribution.
+No public registry release exists yet. Existing cloud objects are not migrated.
+
+Use the standalone core, size limiter or browser module separately; the Azure
+adapter always uses UUID names for new uploads. It is optional and is not a
+transparent proxy for Azure's REST API. AWS S3 and MinIO adapters are not yet
+implemented. The configuration does not toggle the UUID strategy within the
+Azure adapter; use the existing application's storage path if you do not want
+UUID keys. There is no feature that automatically injects into external UIs.
+
+`config.example.json` is a shared, versioned JSON example. It sets a 5 MB
+per-file limit; library defaults remain 50 MB. Only positive integer decimal
+MB values, known fields and boolean module flags are accepted. `locale` is a
+presentation preference. Regional locale codes fall back to the base language,
+and unknown locales fall back to English. Chinese translations are Simplified
+Chinese, not a separate Traditional Chinese catalog. Arabic uses right-to-left
+layout in the demo. Translations are reference drafts, not professionally
+reviewed. Filename encoding is independent of UI language and remains exact.
+
+```python
+from polyglotblobkit import Config, UploadTooLargeError, message
+from polyglotblobkit.azure import AzureFilenameStorage
+
+policy = Config.load('config.example.json')  # trusted server-side configuration
+storage = AzureFilenameStorage.from_config(container, policy)
+# Publish policy.browser_policy() through an authorized application endpoint.
+try:
+    key = storage.upload('合同.pdf', incoming_binary_stream)
+except UploadTooLargeError as exc:
+    # Map to HTTP 413 in your application. Stable code, localized presentation.
+    error = {'code': exc.code, 'limit_bytes': exc.limit_bytes,
+             'message': message(exc.code, policy.locale,
+                                limit=exc.limit_bytes // 1_000_000)}
+```
+
+Never take backend flags or limits from the browser. The server owns policy;
+`browser_policy()` projects only UI settings. `ui_limiter: false` disables
+browser size filtering but never weakens the backend. `legacy_support: false`
+blocks explicit legacy reads, not existing direct SDK access. Disabling the
+backend limiter requires both a trusted config flag and explicit constructor
+opt-in (`allow_unlimited_uploads=True`); only use this when another trusted
+server layer enforces the desired policy. With that opt-in the SDK receives
+raw data without size staging. Direct SAS or alternative upload paths remain
+outside the library's enforcement. No API server is supplied in this release.
+
+```javascript
+import {validateConfiguredFiles} from './web/config.mjs';
+import {message} from './web/i18n.mjs';
+// browserPolicy is supplied by the server; not user-editable in production.
+const result = validateConfiguredFiles(fileInput.files, browserPolicy);
+for (const rejection of result.rejected) {
+  const text = message(rejection.code, browserPolicy.locale,
+                       {limit: browserPolicy.max_upload_mb});
+  // Render text using textContent; never use untrusted filename as HTML.
+}
+// Integrate accepted files with the existing upload handler.
+```
+
+The original `validateFiles(files, limit)` remains available unchanged.
+The new `checked` field distinguishes a disabled check from a passed check.
+The demo in `web/` allows local language and size changes solely for testing;
+it never uploads files. Start it using the local HTTP server command above.
+The shared message catalog (`blob_filename_fix/messages.json`) generates the
+browser module using `python tools/generate_messages.py`; CI verifies equality.
+
+### Verification and known gaps
+
+- Local Python 3.13: 47 tests passed; Node 22: 15 tests passed; catalog check passed.
+- A Chromium smoke test is included (`browser_tests/smoke.py`). The available
+  local Chromium was blocked by an administrator policy on loopback navigation;
+  the browser test is not verified. The CI browser job is configured but not run.
+- Azurite tests and CI remain included, not executed locally (SDK/emulator absent).
+- No live Azure account, third-party systems, older browsers, real drag gesture,
+  or production load/security verification. MIME type/extension preservation,
+  REST gateway, additional storage adapters and other programming language
+  implementations are not part of v0.4.0. Do not treat this as a production release.

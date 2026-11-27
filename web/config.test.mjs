@@ -1,0 +1,17 @@
+import test from 'node:test';
+import assert from 'node:assert/strict';
+import {readFileSync} from 'node:fs';
+import {parseConfig,validateConfiguredFiles} from './config.mjs';
+import {message,resolveLocale,supportedLocales} from './i18n.mjs';
+import {messages} from './messages.mjs';
+const example=JSON.parse(readFileSync(new URL('../config.example.json',import.meta.url),'utf8'));
+const f=(size)=>({name:'合同.pdf',size});
+test('default and common config',()=>{assert.equal(parseConfig().max_upload_mb,50);assert.equal(parseConfig(example).max_upload_mb,5);assert.equal(parseConfig(example).locale,'de');});
+test('reject malformed config',()=>{for(const c of [[],null,{max_upload_mb:0},{max_upload_mb:true},{version:2},{locale:''},{modules:null},{modules:{ui_limiter:'false'}},{unknown:true},{modules:{unknown:true}}])assert.throws(()=>parseConfig(c));});
+test('exact limit and over limit',()=>{const a=f(5_000_000),b=f(5_000_001);const r=validateConfiguredFiles([a,b],example);assert.deepEqual(r.accepted,[a]);assert.equal(r.rejected[0].file,b);assert.equal(r.checked,true);});
+test('disabled UI check preserves order including iterator',()=>{const a=[f(6_000_000),f(1),f(9_000_000)];const r=validateConfiguredFiles(a.values(),{max_upload_mb:5,modules:{ui_limiter:false}});assert.deepEqual(r.accepted,a);assert.deepEqual(r.rejected,[]);assert.equal(r.checked,false);});
+test('backend flag cannot disable UI',()=>{assert.equal(validateConfiguredFiles([f(5_000_001)],{max_upload_mb:5,modules:{backend_limiter:false}}).rejected.length,1);});
+test('server browser projection works',()=>{assert.equal(validateConfiguredFiles([f(5_000_001)],{version:1,max_upload_mb:5,locale:'de',modules:{ui_limiter:true}}).rejected.length,1);});
+test('8 locales and fallback',()=>{assert.equal(supportedLocales.length,8);for(const lang of supportedLocales){assert.match(message('UPLOAD_TOO_LARGE',lang,{limit:5}),/5/);assert.ok(message('ACCEPTED',lang));}assert.equal(resolveLocale('de-DE'),'de');assert.equal(resolveLocale('zh_CN'),'zh');assert.equal(resolveLocale('xx'),'en');assert.equal(resolveLocale('constructor'),'en');});
+test('invalid translation parameters',()=>{assert.throws(()=>message('UPLOAD_TOO_LARGE','de'));assert.throws(()=>message('constructor','de'));});
+test('browser and Python catalogs are identical',()=>{assert.deepEqual(messages,JSON.parse(readFileSync(new URL('../blob_filename_fix/messages.json',import.meta.url),'utf8')));});

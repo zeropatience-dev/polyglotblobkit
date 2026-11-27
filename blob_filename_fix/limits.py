@@ -10,6 +10,8 @@ _SPOOL_THRESHOLD = 1024 * 1024
 
 class UploadTooLargeError(ValueError):
     """Map to HTTP 413 in a web application, if appropriate."""
+    code = "UPLOAD_TOO_LARGE"
+
     def __init__(self, limit_bytes: int):
         self.limit_bytes = limit_bytes
         super().__init__(f'Upload exceeds the {limit_bytes}-byte limit')
