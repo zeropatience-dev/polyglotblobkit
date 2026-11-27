@@ -258,3 +258,7 @@ browser module using `python tools/generate_messages.py`; CI verifies equality.
 ## Security module preview
 
 See [security preview](docs/security-preview.md) for opt-in tenant authorization, local audit and per-tenant limits. This branch does not include the REST prototype or constitute a 0.6.0 release.
+
+## Storage adapter preview
+
+See [storage preview](docs/storage-preview.md) for the optional S3 and MinIO adapters, compatibility limitations and integration impact.

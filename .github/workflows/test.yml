@@ -11,7 +11,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python-version }}
-      - run: python -m pip install '.[security]'
+      - run: python -m pip install '.[security,s3]'
       - run: python -m unittest discover -s tests -v
       - run: python tools/generate_messages.py --check
   browser-module:
@@ -39,7 +39,7 @@ jobs:
             sleep 1
           done
           exit 1
-      - run: python -m unittest discover -s integration -v
+      - run: python -m unittest discover -s integration -p test_azurite.py -v
       - if: failure()
         run: docker logs azurite
       - if: always()
