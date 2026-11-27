@@ -1,0 +1,26 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "polyglotblobkit"
+version = "0.8.0a1"
+description = "UUID object keys, reversible Unicode filenames and upload size limits"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {file = "LICENSE"}
+dependencies = []
+
+[project.optional-dependencies]
+azure = ["azure-storage-blob>=12,<13"]
+s3 = ["boto3>=1.36,<2"]
+minio = ["boto3>=1.36,<2"]
+security = ["PyJWT[crypto]>=2.10.1,<3"]
+http = ["fastapi>=0.115,<1", "uvicorn>=0.30,<1", "PyJWT[crypto]>=2.10.1,<3"]
+test = ["httpx>=0.27,<1", "fastapi>=0.115,<1"]
+
+[tool.setuptools.packages.find]
+include = ["blob_filename_fix*", "polyglotblobkit*"]
+
+[tool.setuptools.package-data]
+blob_filename_fix = ["messages.json"]

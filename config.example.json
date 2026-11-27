@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "max_upload_mb": 5,
+  "locale": "de",
+  "modules": {
+    "ui_limiter": true,
+    "backend_limiter": true,
+    "legacy_support": true
+  }
+}

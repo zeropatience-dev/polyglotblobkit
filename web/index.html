@@ -1,0 +1,15 @@
+<!doctype html>
+<html lang="de" dir="ltr">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PolyglotBlobKit</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:720px;margin:3rem auto;padding:0 1rem;color:#172033} #drop{border:2px dashed #64748b;border-radius:12px;padding:2rem;margin:1rem 0;background:#f8fafc} #drop.active{background:#e2e8f0} .bad{color:#a61b1b}.ok{color:#166534} li{overflow-wrap:anywhere;margin:.5rem 0} input{max-width:100%} .controls{display:flex;gap:1rem;flex-wrap:wrap;align-items:center} label{display:inline-flex;gap:.4rem;align-items:center} input[type=number]{width:7em} bdi{unicode-bidi:isolate}
+</style></head><body>
+<header><small>PolyglotBlobKit · v0.4.0</small><h1 data-msg="TITLE"></h1><p data-msg="INTRO"></p></header>
+<div class="controls"><label><span data-msg="LANGUAGE"></span><select id="locale"><option value="de">Deutsch</option><option value="en">English</option><option value="fr">Français</option><option value="es">Español</option><option value="tr">Türkçe</option><option value="zh">简体中文</option><option value="ja">日本語</option><option value="ar">العربية</option></select></label>
+<label><span data-msg="LIMIT"></span><input type="number" min="1" step="1" id="limit" value="5"></label>
+<label><input type="checkbox" id="enabled" checked><span data-msg="ENABLE"></span></label></div>
+<div id="drop"><p data-msg="DROP"></p><input id="files" type="file" multiple></div>
+<ul id="results" aria-live="polite"></ul>
+<script type="module" src="./demo.mjs"></script>
+</body></html>
