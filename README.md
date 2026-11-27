@@ -254,3 +254,7 @@ browser module using `python tools/generate_messages.py`; CI verifies equality.
   or production load/security verification. MIME type/extension preservation,
   REST gateway, additional storage adapters and other programming language
   implementations are not part of v0.4.0. Do not treat this as a production release.
+
+## Security module preview
+
+See [security preview](docs/security-preview.md) for opt-in tenant authorization, local audit and per-tenant limits. This branch does not include the REST prototype or constitute a 0.6.0 release.
