@@ -1,6 +1,6 @@
 # Universal Blob Filename Fix
 
-An open-source reference library for separating technical object keys from human filenames. **Prototype v0.2.0**; not an official Azure fix or production-certified service.
+An open-source reference library for separating technical object keys from human filenames. **Prototype v0.3.0**; not an official Azure fix or production-certified service.
 
 ## Design
 
@@ -76,7 +76,7 @@ This is a per-file limit, not a per-request, user or tenant quota. Configure req
 
 ## Security and scope
 
-The library is not an access-control layer. UUIDs are not credentials; the application must enforce authorization, quotas, malware checks, retention and tenant isolation. Base64 is not encryption; do not store confidential filenames in metadata if your threat model forbids that. Metadata may be visible to principals with blob read access. This library rejects path separators and control characters and imposes a 1024-byte UTF-8 filename limit (a library policy, not an Azure filename limit). Windows and other local filesystems may impose additional restrictions; never blindly write the recovered name to disk. Metadata must be preserved when copying blobs. The application should store the key durably and handle failed uploads or orphan objects. Legacy blobs are not modified or automatically migrated; keep the existing retrieval path for them. The mock-based tests verify the SDK call contract but are not a real Azure integration test. Validate against a test account or emulator before production use.
+The library is not an access-control layer. UUIDs are not credentials; the application must enforce authorization, quotas, malware checks, retention and tenant isolation. Base64 is not encryption; do not store confidential filenames in metadata if your threat model forbids that. Metadata may be visible to principals with blob read access. This library rejects path separators and control characters and imposes a 1024-byte UTF-8 filename limit (a library policy, not an Azure filename limit). Windows and other local filesystems may impose additional restrictions; never blindly write the recovered name to disk. Metadata must be preserved when copying blobs. The application should store the key durably and handle failed uploads or orphan objects. Legacy blobs are not modified or automatically migrated; use the explicit legacy read path described below, or retain the existing application retrieval path. The mock-based tests verify the SDK call contract but are not a real Azure integration test. Validate against a test account or emulator before production use.
 
 ## Public repository
 
@@ -94,10 +94,80 @@ Choose Public when creating the empty repository if it should be available to ev
 
 ## Deutsch
 
-Dateinamen in allen Sprachen bleiben unverändert in Metadaten erhalten; der technische Blob-Name besteht ausschließlich aus einer UUID. Die Python-Referenzbibliothek ist unabhängig von internen Anwendungen. Ein Azure-Adapter ist enthalten. Andere Speicheranbieter benötigen eigene Adapter. Bestehende Dateien werden nicht verändert; die aufrufende Anwendung muss die Bibliothek integrieren. Seit v0.2.0 gilt ein konfigurierbares Upload-Limit von standardmäßig 50 MB pro Datei (1 MB = 1.000.000 Bytes). Zu große Dateien werden vor dem Cloud-Upload abgelehnt. Kein Live-Test gegen Azure durchgeführt.
+Dateinamen in allen Sprachen bleiben unverändert in Metadaten erhalten; der technische Blob-Name besteht ausschließlich aus einer UUID. Die Python-Referenzbibliothek ist unabhängig von internen Anwendungen. Ein Azure-Adapter ist enthalten. Andere Speicheranbieter benötigen eigene Adapter. Bestehende Dateien werden nicht verändert; ab v0.3.0 gibt es einen expliziten Legacy-Lesezugriff sowie einen browserseitigen Limiter. Die aufrufende Anwendung muss beide integrieren. Seit v0.2.0 gilt ein konfigurierbares Upload-Limit von standardmäßig 50 MB pro Datei (1 MB = 1.000.000 Bytes). Zu große Dateien werden vor dem Cloud-Upload abgelehnt. Kein Live-Test gegen Azure durchgeführt.
 
 ## References
 
 - [Azure naming rules](https://learn.microsoft.com/en-us/rest/api/storageservices/naming-and-referencing-containers--blobs--and-metadata)
 - [Azure Python BlobClient](https://learn.microsoft.com/en-us/python/api/azure-storage-blob/azure.storage.blob.blobclient)
 - [RFC 8187](https://www.rfc-editor.org/rfc/rfc8187)
+
+## v0.3.0: browser validation and legacy reads
+
+The dependency-free ES module in `web/upload-limiter.mjs` is a browser-side
+preflight check for File objects from drag-and-drop or a file input. Only
+accepted files should be sent to the existing application upload handler:
+
+```js
+import { validateFiles } from './upload-limiter.mjs';
+const { accepted, rejected } = validateFiles(files, 5);
+// Show rejected files and their error codes in the UI.
+// Pass only accepted to the existing upload handler.
+```
+
+Configure both checks with the same server-owned policy, e.g.
+`AzureFilenameStorage(container, max_upload_mb=5)`. The library defaults remain
+50 MB to preserve v0.2.0 behavior; the demo starts at 5 MB. Do not trust the
+browser to enforce a security policy. A direct SAS upload or a different
+backend route can bypass it. Restrict storage write access to validated routes
+if the limit must be enforced. Multiple files are validated individually; this
+is not an aggregate quota, a content-type check or malware scanning.
+
+Run the offline demo with `python -m http.server 8000 --bind 127.0.0.1` from
+the repository root, then open `http://127.0.0.1:8000/web/`. No file content
+is sent anywhere or persisted by the demo. Run the module tests with Node 22:
+
+```sh
+node --test web/upload-limiter.test.mjs
+```
+
+Existing objects can be retrieved through an explicitly selected legacy route:
+
+```python
+# Resolve and authorize the exact reference in the application first.
+name, stream = storage.download_legacy('tenant/2026/合同 #%.pdf')
+# If the stored name is not a reliable display name:
+name, stream = storage.download_legacy('old-key', original_filename='合同.pdf')
+```
+
+The argument is an exact SDK blob name, not a URL or SAS link. The SDK handles
+encoding; the library does not decode, normalize or rename old keys. The
+filename comes from the explicit argument, existing filename metadata, or
+finally the last slash-delimited segment (subject to the library's filename
+validation). Invalid or corrupt metadata fails rather than silently guessing.
+The application must authorize the exact blob and select the legacy route;
+never let a user bypass authorization by submitting an arbitrary key. Legacy
+write/delete semantics and old URLs remain the application's responsibility.
+Normal GUID download/delete behavior is unchanged.
+
+## Emulator integration tests
+
+The `integration/` suite creates and deletes its own uniquely named test
+container. Use a dedicated test environment only. Start Azurite following
+[Microsoft's automated testing guide](https://learn.microsoft.com/en-us/azure/storage/blobs/use-azurite-to-run-automated-tests), then set
+`AZURE_STORAGE_CONNECTION_STRING` to the emulator connection string and run:
+
+```sh
+python -m pip install '.[azure]'
+python -m unittest discover -s integration -v
+```
+
+GitHub Actions is configured to start Azurite and run these three integration
+tests in addition to Python and Node unit tests. The public emulator-only
+credential in the workflow is not a real Azure secret. No SDK or API-version
+check is disabled. The workflow and emulator tests have not been executed in
+the build environment; Docker, Azurite and the Azure SDK were unavailable.
+The local results are 33 Python tests and 6 Node tests passed. The demo's DOM
+interaction has not been exercised in a real browser. Live Azure, Azure Data
+Lake/SFTP, third-party systems, REST gateway, MIME type/extension compatibility,
+and load/security testing remain outside this release's verified scope.

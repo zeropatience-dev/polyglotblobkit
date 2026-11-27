@@ -1,0 +1,37 @@
+<!doctype html>
+<html lang="de">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Upload-Limiter – Demo</title>
+<style>
+body{font:16px system-ui,sans-serif;max-width:680px;margin:3rem auto;padding:0 1rem;color:#172033} #drop{border:2px dashed #64748b;border-radius:12px;padding:2rem;margin:1rem 0;background:#f8fafc} #drop.active{background:#e2e8f0} .bad{color:#a61b1b}.ok{color:#166534} li{overflow-wrap:anywhere;margin:.5rem 0} input{max-width:100%}
+</style>
+<h1>Upload-Limiter</h1>
+<p>Lokale Demonstration – keine Datei wird übertragen oder gespeichert.</p>
+<label>Limit pro Datei (MB): <input type="number" min="1" step="1" id="limit" value="5"></label>
+<div id="drop"><p>Dateien hierher ziehen oder auswählen:</p><input id="files" type="file" multiple></div>
+<ul id="results" aria-live="polite"></ul>
+<script type="module">
+import {validateFiles} from './upload-limiter.mjs';
+const drop = document.querySelector('#drop'), results = document.querySelector('#results');
+const limit = document.querySelector('#limit'), picker = document.querySelector('#files');
+let selected = [];
+function check(files) {
+  selected = Array.from(files); results.replaceChildren();
+  const add = (message, cls) => { const li = document.createElement('li'); li.textContent = message; li.className = cls; results.append(li); };
+  try {
+    const {accepted, rejected} = validateFiles(selected, limit.valueAsNumber);
+    for (const f of accepted) add(`${f.name}: ${f.size} Bytes – akzeptiert`, 'ok');
+    for (const {file:f,maxBytes} of rejected) add(`${f.name}: ${f.size} Bytes – abgelehnt (max. ${maxBytes} Bytes)`, 'bad');
+    // Only accepted files may be passed to the application's upload function.
+    // This demonstration intentionally does not implement any network upload.
+  } catch (e) { add(e.message, 'bad'); }
+}
+picker.addEventListener('change', () => check(picker.files));
+limit.addEventListener('input', () => check(selected));
+for (const type of ['dragenter','dragover']) drop.addEventListener(type, e => {e.preventDefault(); drop.classList.add('active');});
+drop.addEventListener('dragleave', () => drop.classList.remove('active'));
+drop.addEventListener('drop', e => {e.preventDefault();drop.classList.remove('active');check(e.dataTransfer.files);});
+window.addEventListener('dragover', e => e.preventDefault());
+window.addEventListener('drop', e => e.preventDefault());
+</script>
+</html>
